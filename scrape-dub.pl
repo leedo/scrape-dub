@@ -42,6 +42,7 @@ for my $name ( keys %urls ) {
     my $item_hrefs = $index->scrape($res->content);
 
     for my $item_href ( @{ $item_hrefs->{hrefs} } ) {
+        my $ua = LWP::UserAgent->new( cookie_jar => {} );
         my $item_uri = URI->new($url);
         $item_uri->path_query($item_href);
 
@@ -58,27 +59,84 @@ for my $name ( keys %urls ) {
             my $file_uri = URI->new($url);
             $file_uri->path_query($item->{dl});
 
-            $item->{date} =~ s/^\s+//;
-            $item->{date} =~ s/\s+$//;
+            for my $f (qw(date title)) {
+              $item->{$f} =~ s/^\s+//;
+              $item->{$f} =~ s/\s+$//;
+            }
 
             my ($ss,$mm,$hh,$d,$m,$y,$z) = strptime($item->{date});
             $y += 1900;
             my $dir = sprintf '%s/%s/%04d', $root, $name, $y;
             system 'mkdir', '-p', $dir;
 
-            my $path = sprintf '%s/%02d-%02d-%04d.mp3', $dir, $m, $d, $y;
-            warn "===> Downloading $path\n";
+            $ua->add_handler(
+              response_header => sub {
+                my ($res, $ua, $handler) = @_;
 
-            next if -e $path;
+                return unless $res->code == 200;
+
+                my $type = $res->header('content-type');
+                my $disposition = $res->header('content-disposition');
+
+                if (!$disposition) {
+                  use Data::Dumper;
+                  warn Dumper($res);
+                  warn $res->content;
+                  die;
+                }
+
+                my @parts = split ';', $disposition;
+                my %kv;
+                for my $p (@parts) {
+                  my ($k, $v) = split '=', $p;
+                  $kv{$k} = $v;
+                }
+
+                my $file = $kv{filename};
+                my $path = "$dir/$file";
+
+                return if -e $path;
+
+                warn "===> Writing to $path\n";
+
+                open my $fh, '>', "$path.tmp" or die "Unable to open $path: $!";
+
+                $ua->add_handler(
+                  response_data => sub {
+                    my ($res, $ua, $handler, $data) = @_;
+                    print $fh $data;
+                  }
+                );
+
+                $ua->add_handler(
+                  response_done => sub {
+                    my ($res, $ua, $handler) = @_;
+                    close $fh;
+                    if ($res->code == 200) {
+                      warn "===> Tagging $path\n";
+                      my %tags = (
+                        album  => $name,
+                        year   => $y,
+                        title  => $item->{date},
+                        artist => $name,
+                        author => $name,
+                        show   => $name,
+                      );
+                      system 'ffmpeg', '-i', "$path.tmp", '-c:a', 'copy', map({ ('-metadata', "$_=$tags{$_}") } keys %tags), $path;
+                      system 'rm', "$path.tmp";
+                    }
+                    else {
+                      unlink $fh;
+                    }
+                  }
+                );
+              }
+            );
+
+            warn "===> Fetching file for $item->{title}\n";
 
             my $req = HTTP::Request->new( GET => $file_uri );
-            my $res = $ua->request($req, $path);
-            if ($res->is_success) {
-              system 'mp3info', '-a', 'WCBN', '-l', $name, '-t', $item->{date}, '-y', $y, $path;
-            }
-            else {
-              unlink $path;
-            }
+            my $res = $ua->request($req);
         }
     }
 }
