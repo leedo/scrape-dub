@@ -95,7 +95,7 @@ for my $name ( keys %urls ) {
                 my $file = $kv{filename};
                 my $path = "$dir/$file";
 
-                return if -e $path;
+                die "File exists" if -e $path;
 
                 warn "===> Writing to $path\n";
 
@@ -116,10 +116,11 @@ for my $name ( keys %urls ) {
                       warn "===> Tagging $path\n";
                       my %tags = (
                         album  => $name,
+                        date   => sprintf("%02d%02d", $d+1, $m+1),
                         year   => $y,
-                        title  => $item->{date},
-                        artist => $name,
-                        author => $name,
+                        title  => $item->{title},
+                        artist => 'WCBN',
+                        author => 'WCBN',
                         show   => $name,
                       );
                       system 'ffmpeg', '-i', "$path.tmp", '-c:a', 'copy', map({ ('-metadata', "$_=$tags{$_}") } keys %tags), $path;
