@@ -112,23 +112,20 @@ for my $name ( keys %urls ) {
                   response_done => sub {
                     my ($res, $ua, $handler) = @_;
                     close $fh;
-                    if ($res->code == 200) {
-                      warn "===> Tagging $path\n";
-                      my %tags = (
-                        album  => $name,
-                        date   => sprintf("%02d%02d", $d+1, $m+1),
-                        year   => $y,
-                        title  => $item->{title},
-                        artist => 'WCBN',
-                        author => 'WCBN',
-                        show   => $name,
-                      );
-                      system 'ffmpeg', '-i', "$path.tmp", '-c:a', 'copy', map({ ('-metadata', "$_=$tags{$_}") } keys %tags), $path;
-                      system 'rm', "$path.tmp";
-                    }
-                    else {
-                      unlink $fh;
-                    }
+
+                    warn "===> Tagging $path\n";
+
+                    my %tags = (
+                      album  => $name,
+                      date   => sprintf("%02d%02d", $d+1, $m+1),
+                      year   => $y,
+                      title  => $item->{title},
+                      artist => 'WCBN',
+                      author => 'WCBN',
+                      show   => $name,
+                    );
+                    system 'ffmpeg', '-i', "$path.tmp", '-c:a', 'copy', map({ ('-metadata', "$_=$tags{$_}") } keys %tags), $path;
+                    system 'rm', "$path.tmp";
                   }
                 );
               }
@@ -140,6 +137,7 @@ for my $name ( keys %urls ) {
             my $res = $ua->request($req);
         }
     }
+    warn "===> Done with $name\n";
 }
 
 sleep 60 * 60 * 12;
