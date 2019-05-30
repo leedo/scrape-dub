@@ -46,8 +46,6 @@ for my $name ( keys %urls ) {
         my $item_uri = URI->new($url);
         $item_uri->path_query($item_href);
 
-        warn "===> Fetching $item_uri\n";
-
         my $res = $ua->get($item_uri);
         if ($res->code != 200) {
             die "Item error: ", $res->content;
@@ -97,7 +95,7 @@ for my $name ( keys %urls ) {
 
                 die "File exists" if -e $path;
 
-                warn "===> Writing to $path\n";
+                warn "===> Fetchinig $item_uri to $path\n";
 
                 open my $fh, '>', "$path.tmp" or die "Unable to open $path: $!";
 
@@ -121,7 +119,6 @@ for my $name ( keys %urls ) {
                       year   => $y,
                       title  => $item->{title},
                       artist => 'WCBN',
-                      author => 'WCBN',
                       show   => $name,
                     );
                     system 'ffmpeg', '-i', "$path.tmp", '-c:a', 'copy', map({ ('-metadata', "$_=$tags{$_}") } keys %tags), $path;
@@ -130,8 +127,6 @@ for my $name ( keys %urls ) {
                 );
               }
             );
-
-            warn "===> Fetching file for $item->{title}\n";
 
             my $req = HTTP::Request->new( GET => $file_uri );
             my $res = $ua->request($req);
